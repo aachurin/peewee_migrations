@@ -23,13 +23,14 @@ Usage
 =====
 After installation, run `pem init` in the project root.
 
-Suppose we have `Foo` model in `models.py`::
+Suppose we have `Foo` model in `models.py`
 
-  class Foo(db.Model):
-      bar = peewee.CharField(max_length=50)
-      baz = peewee.IntegerField()
-      quux = peewee.IntegerField()
-
+```python
+class Foo(db.Model):
+    bar = peewee.CharField(max_length=50)
+    baz = peewee.IntegerField()
+    quux = peewee.IntegerField()
+```
 
 Add model to the watch list and create migration.
 ```bash
@@ -59,13 +60,14 @@ $ pem migrate
 [X] 0001_migration_201807191008
 ```
 
-And now, if you change your model `Foo`::
-
-  class Foo(db.Model):
-      bar = peewee.CharField(max_length=20)
-      baz = peewee.IntegerField()
-      quux = peewee.IntegerField()
-      xyzzy = peewee.IntegerField()
+And now, if you change your model `Foo`
+```python
+class Foo(db.Model):
+    bar = peewee.CharField(max_length=20)
+    baz = peewee.IntegerField()
+    quux = peewee.IntegerField()
+    xyzzy = peewee.IntegerField()
+```
 
 Run `watch` to create new migration:
 ```bash

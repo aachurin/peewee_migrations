@@ -15,10 +15,9 @@ Installation
 
 This package can be installed using pip:
 
-::
-
-  pip install peewee-migrations
-
+```bash
+pip install peewee-migrations
+```
 
 Usage
 =====

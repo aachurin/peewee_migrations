@@ -1,5 +1,5 @@
 Peewee Migrations
-#################
+=================
 
 A simple and flexible migration manager for Peewee ORM.
 

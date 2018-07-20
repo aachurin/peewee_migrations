@@ -10,13 +10,14 @@ with open(path.join(root_dir, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='peewee-migrations',
-    version='0.3.6',
+    version='0.3.7',
     url='https://github.com/aachurin/peewee_migrations',
     license='LGPL3',
     author='Andrey Churin',
     author_email='aachurin@gmail.com',
     description='Migration engine for peewee orm',
     long_description=long_description,
+    long_description_content_type='text/markdown',
     packages=['peewee_migrations'],
     zip_safe=False,
     platforms='any',

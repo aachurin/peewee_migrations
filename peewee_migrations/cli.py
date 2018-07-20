@@ -4,6 +4,7 @@ import click
 import importlib
 import peewee
 import json
+from traceback import format_exc
 from . migrator import Router, MigrationError
 
 
@@ -198,15 +199,18 @@ def droptables(ctx):
 
 
 @cli.command()
+@click.option('--traceback', is_flag=True, help='Show traceback')
 @click.pass_context
-def watch(ctx):
+def watch(ctx, traceback):
     """Watch model changes and create migration"""
 
     router = load_router(ctx)
     try:
         result = router.create()
-    except MigrationError as e:
+    except Exception as e:
         click.secho('Migration error: ' + str(e), fg='red')
+        if traceback:
+            click.secho(format_exc(), fg='yellow', bold=True)
         return
     if not result:
         click.secho('No changes found.', fg='green')

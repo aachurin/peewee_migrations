@@ -1,27 +1,31 @@
-Peewee Migrations
-=================
+# Peewee Migrations
 
 A simple and flexible migration manager for Peewee ORM.
 
-Requirements
-============
+* **Version:** 0.3.6
+* **Status:** Development/Alpha
+* **Author:** Churin Andrey
+
+# Requirements
 
 * python >= 3.5
 * latest peewee
 
 
-Installation
-============
+## Quick start
 
 This package can be installed using pip:
 
 ```bash
-pip install peewee-migrations
+$ pip install peewee-migrations
 ```
 
-Usage
-=====
-After installation, run `pem init` in the project root.
+Run `pem init` in the project root.
+
+```bash
+$ pem init
+Configuration file 'migrations.json' was created.
+```
 
 Suppose we have `Foo` model in `models.py`
 
@@ -32,7 +36,8 @@ class Foo(db.Model):
     quux = peewee.IntegerField()
 ```
 
-Add model to the watch list and create migration.
+Add this model to the watch list and create migration.
+
 ```bash
 $ pem add models.Tweet
 Model 'models.Foo' was added to the watch list.
@@ -41,12 +46,14 @@ Migration `0001_migration_201807191008` has been created.
 ```
 
 Now you can list available migrations:
+
 ```bash
 $ pem list
 [ ] 0001_migration_201807191008
 ```
 
 Or view SQL that will be executed during migration:
+
 ```bash
 $ pem show
 [ ] 0001_migration_201807191008:
@@ -55,12 +62,14 @@ $ pem show
 ```
 
 Use `migrate` to run migrations:
+
 ```bash
 $ pem migrate
 [X] 0001_migration_201807191008
 ```
 
-And now, if you change your model `Foo`
+Change model `Foo`
+
 ```python
 class Foo(db.Model):
     bar = peewee.CharField(max_length=20)
@@ -69,7 +78,8 @@ class Foo(db.Model):
     xyzzy = peewee.IntegerField()
 ```
 
-Run `watch` to create new migration:
+and run `watch` to create new migration:
+
 ```bash
 $ pem watch
 Migration `0002_migration_201807191036` has been created.

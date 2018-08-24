@@ -120,7 +120,6 @@ def remove(ctx, model):
 
 
 def load_conf(ctx):
-    conf = {}
     filename = ctx.obj['config']
     with open(filename, 'rt') as f:
         conf = json.load(f)
@@ -130,7 +129,7 @@ def load_conf(ctx):
             prerun = '\n'.join(conf['prerun'])
         else:
             prerun = conf['prerun']
-            exec(prerun, {})
+        exec(prerun, {})
 
     errors = False
     if not conf.get('directory'):
@@ -200,15 +199,25 @@ def droptables(ctx):
 
 @cli.command()
 @click.option('--traceback', is_flag=True, help='Show traceback')
+@click.option('--tracecode', is_flag=True, help='Show generated code')
 @click.pass_context
-def watch(ctx, traceback):
+def watch(ctx, traceback, tracecode):
     """Watch model changes and create migration"""
 
     router = load_router(ctx)
+    if tracecode:
+        context = {}
+    else:
+        context = None
     try:
-        result = router.create()
+        result = router.create(tracecode=context)
     except Exception as e:
         click.secho('Migration error: ' + str(e), fg='red')
+        if tracecode and context.get('code'):
+            lines = context['code'].splitlines()
+            code = [(click.style('% 5d ' % num, fg='yellow') + click.style(line, fg='white'))
+                        for num, line in enumerate(lines, 1)]
+            click.echo('\n'.join(code))
         if traceback:
             click.secho(format_exc(), fg='yellow', bold=True)
         return

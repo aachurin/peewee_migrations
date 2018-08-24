@@ -227,10 +227,18 @@ def deconstruct_foreignkey(field, params, complete):
         params['on_delete'] = field.on_delete
     if field.on_update:
         params['on_update'] = field.on_update
+    if field.deferrable:
+        params['deferrable'] = field.deferrable
     if field.model is field.rel_model:
         params['model'] = '@self'
     else:
         params['model'] = field.rel_model._meta.name
+
+
+@deconstructor(peewee.DeferredForeignKey)
+def deconstruct_deferredforeignkey(field, params, complete):
+    raise TypeError("DeferredForeignKey '%s.%s' will not be resolved, use ForeignKeyField instead" % (
+        field.model.__name__, field.name))
 
 
 class Snapshot():
@@ -591,7 +599,7 @@ class Router():
     def clear(self):
         self.storage.clear()
 
-    def create(self, name=None):
+    def create(self, name=None, tracecode=None):
         """Create a migration."""
         name = self.storage.get_name(name)
         last_step = self.storage.get_last_step()
@@ -600,6 +608,8 @@ class Router():
         if compiler.snapshot == Compiler(self.database, last_snap).snapshot:
             return []
         alerts = [name]
+        if tracecode is not None:
+            tracecode['code'] = compiler.module_code
         new_snap = self.storage.exec(compiler.module_code)['snapshot']
         migrator = Migrator(self.database, name, last_snap, new_snap, compute_hints=True)
         migrator.migrate()

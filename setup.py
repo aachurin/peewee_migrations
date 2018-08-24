@@ -10,7 +10,7 @@ with open(path.join(root_dir, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='peewee-migrations',
-    version='0.3.7',
+    version='0.3.10',
     url='https://github.com/aachurin/peewee_migrations',
     license='LGPL3',
     author='Andrey Churin',
@@ -22,7 +22,7 @@ setup(
     zip_safe=False,
     platforms='any',
     install_requires=[
-        'peewee >= 3.0.10',
+        'peewee >= 3.6.4',
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

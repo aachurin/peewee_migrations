@@ -216,7 +216,7 @@ def watch(ctx, traceback, tracecode):
         if tracecode and context.get('code'):
             lines = context['code'].splitlines()
             code = [(click.style('% 5d ' % num, fg='yellow') + click.style(line, fg='white'))
-                        for num, line in enumerate(lines, 1)]
+                    for num, line in enumerate(lines, 1)]
             click.echo('\n'.join(code))
         if traceback:
             click.secho(format_exc(), fg='yellow', bold=True)

@@ -8,7 +8,7 @@ from collections import OrderedDict, namedtuple
 from playhouse.postgres_ext import ArrayField
 
 
-__all__ = ('Router', 'Snapshot', 'Migrator', 'deconstructor')
+__all__ = ('Router', 'Snapshot', 'Migrator', 'MigrationError', 'deconstructor')
 
 
 INDENT = ' ' * 4
@@ -41,7 +41,7 @@ class LiteralBlock:
         return self.value
 
 
-class CallBlock():
+class CallBlock:
 
     def __init__(self, fn, args=None, kwargs=None):
         self.fn = fn
@@ -80,7 +80,7 @@ def get_constraints(constraints):
     return result
 
 
-class Column():
+class Column:
 
     __slots__ = ('modules', 'field_class', 'name', '__dict__')
 
@@ -154,7 +154,7 @@ class Column():
         else:
             for cls in type(field).__mro__:
                 if cls in self._deconstructors:
-                    self._deconstructors[cls](field, params, complete=complete)
+                    self._deconstructors[cls](field, params=params, complete=complete)
                     break
 
         # Handle default value.
@@ -180,18 +180,18 @@ class Column():
 
 
 @deconstructor(peewee.DateTimeField)
-def datetimefield_deconstructor(field, params, **kwargs):
+def datetimefield_deconstructor(field, params, **_):
     if not isinstance(field.formats, list):
         params['formats'] = field.formats
 
 
 @deconstructor(peewee.CharField)
-def charfield_deconstructor(field, params, **kwargs):
+def charfield_deconstructor(field, params, **_):
     params['max_length'] = field.max_length
 
 
 @deconstructor(peewee.DecimalField)
-def decimalfield_deconstructor(field, params, **kwargs):
+def decimalfield_deconstructor(field, params, **_):
     params['max_digits'] = field.max_digits
     params['decimal_places'] = field.decimal_places
     params['auto_round'] = field.auto_round
@@ -199,7 +199,7 @@ def decimalfield_deconstructor(field, params, **kwargs):
 
 
 @deconstructor(ArrayField)
-def arrayfield_deconstructor(field, params, **kwargs):
+def arrayfield_deconstructor(field, params, **_):
     params['dimensions'] = field.dimensions
     params['convert_values'] = field.convert_values
     params['field_class'] = field._ArrayField__field.__class__
@@ -236,12 +236,12 @@ def deconstruct_foreignkey(field, params, complete):
 
 
 @deconstructor(peewee.DeferredForeignKey)
-def deconstruct_deferredforeignkey(field, params, complete):
+def deconstruct_deferredforeignkey(field, **_):
     raise TypeError("DeferredForeignKey '%s.%s' will not be resolved, use ForeignKeyField instead" % (
         field.model.__name__, field.name))
 
 
-class Snapshot():
+class Snapshot:
 
     def __init__(self, database, models):
         self.mapping = {}
@@ -278,7 +278,7 @@ class Snapshot():
             return peewee.DeferredForeignKey(model, **kwargs)
 
 
-class cached_property():
+class cached_property:
 
     def __init__(self, func, name=None):
         self.func = func
@@ -291,7 +291,7 @@ class cached_property():
         return res
 
 
-class NodeDeconstructor():
+class NodeDeconstructor:
 
     def get_code(self, node):
         for tp in type(node).__mro__:
@@ -304,10 +304,12 @@ class NodeDeconstructor():
     def generic_code(self, node):
         raise ValueError('unsupported node: % r' % node)
 
-    def code_SQL(self, node):
+    @staticmethod
+    def code_SQL(node):
         return CallBlock('SQL', args=(node.sql, node.params))
 
-    def code_Table(self, node):
+    @staticmethod
+    def code_Table(node):
         kwargs = {'name': node.__name__}
         if node._schema:
             kwargs['schema'] = node._schema
@@ -346,7 +348,7 @@ class NodeDeconstructor():
         return CallBlock('Column', args=(self.get_code(node.source), node.name))
 
 
-class Compiler():
+class Compiler:
 
     def __init__(self, database, models, modules=('datetime', 'peewee')):
         self.database = database
@@ -386,7 +388,7 @@ class Compiler():
 
         field_code = []
         for field in model._meta.sorted_fields:
-            if isinstance(field, peewee.AutoField) and field.name == 'id':
+            if type(field) is peewee.AutoField and field.name == 'id':
                 continue
             column = Column(field)
             field_code.append(column.to_code())
@@ -529,7 +531,7 @@ class Storage:
 
 class FileStorage(Storage):
 
-    filemask = re.compile(r"[\d]{4}_[^\.]+\.py$")
+    filemask = re.compile(r"[\d]{4}_[^.]+\.py$")
 
     def __init__(self, *args, migrate_dir='migrations', **kwargs):
         super().__init__(*args, **kwargs)
@@ -577,7 +579,7 @@ class MemoryStorage(Storage):
         self._migrations = {}
 
 
-class Router():
+class Router:
 
     def __init__(self, database, models, storage_class=FileStorage, **storage_kwargs):
         self.database = database
@@ -704,27 +706,27 @@ class Migrator:
             self.compute_hints = False
         self.op = OperationProxy(Operations.from_database(database), self.add_op)
 
-    @classmethod
-    def add_hint(cls, type1, type2, *tests, final=True):
-        if type1 is None:
-            def f1(obj): return True
-        else:
-            def f1(obj): return isinstance(obj.old_field, type1)
-        if type2 is None:
-            def f2(obj): return True
-        else:
-            def f2(obj): return isinstance(obj.new_field, type2)
-        assert all(callable(x) for x in tests)
-
-        def appender(fn):
-            cls.hints.append(
-                HintDescription(
-                    test=(lambda obj: f1(obj) and f2(obj) and all(f(obj) for f in tests)),
-                    exec=fn,
-                    final=final
-                ))
-            return fn
-        return appender
+    # @classmethod
+    # def add_hint(cls, type1, type2, *tests, final=True):
+    #     if type1 is None:
+    #         def f1(_): return True
+    #     else:
+    #         def f1(obj): return isinstance(obj.old_field, type1)
+    #     if type2 is None:
+    #         def f2(_): return True
+    #     else:
+    #         def f2(obj): return isinstance(obj.new_field, type2)
+    #     assert all(callable(x) for x in tests)
+    #
+    #     def appender(fn):
+    #         cls.hints.append(
+    #             HintDescription(
+    #                 test=(lambda obj: f1(obj) and f2(obj) and all(f(obj) for f in tests)),
+    #                 exec=fn,
+    #                 final=final
+    #             ))
+    #         return fn
+    #     return appender
 
     def add_op(self, obj, *, args=None, kwargs=None, color=None, forced=False):
         if isinstance(obj, list):
@@ -776,12 +778,14 @@ class Migrator:
         for name in [m for m in reversed(models1) if m not in models2]:
             self.op.drop_table(models1[name])
 
-    def _is_index_for_foreign_key(self, index):
+    @staticmethod
+    def _is_index_for_foreign_key(index):
         return (isinstance(index, peewee.Index)
                 and len(index._expressions) == 1
                 and isinstance(index._expressions[0], peewee.ForeignKeyField))
 
-    def _get_primary_key_columns(self, model):
+    @staticmethod
+    def _get_primary_key_columns(model):
         return tuple(f.column_name for f in model._meta.get_primary_keys())
 
     def _get_indexes(self, model):
@@ -847,7 +851,7 @@ class Migrator:
             drop_not_null=[]
         )
 
-    def _prepare_model(self, state, model1, model2):
+    def _prepare_model(self, state, model1, _):
         if state.pk_columns1 and state.pk_columns1 != state.pk_columns2:
             self.op.drop_primary_key_constraint(model1)
 
@@ -857,7 +861,7 @@ class Migrator:
         for index in state.drop_indexes:
             self.op.drop_index(model1, index)
 
-    def _update_model(self, state, model1, model2):
+    def _update_model(self, state, _, __):
         for field in state.add_fields:
             # if field is model2._meta.primary_key:
             #     field = self._get_primary_key_field(field)
@@ -891,7 +895,7 @@ class Migrator:
                     state.add_not_null.append(field2)
                 self.add_data_migration_hints(field1, field2, False)
 
-    def _cleanup_model(self, state, model1, model2):
+    def _cleanup_model(self, state, _, model2):
         for field in state.drop_fields:
             self.op.drop_column(field)
 
@@ -1008,25 +1012,20 @@ def escaped_repr(obj):
     return repr(obj).replace('{', '{{').replace('}', '}}')
 
 
-def set_not_null_helper(new_field, **kwargs):
+def set_not_null_helper(new_field, **_):
     default = new_field.default
     if callable(default):
         default = default()
-    comment = ''
     if default is None:
         for cls, default_value in FIELD_DEFAULTS:
             if isinstance(new_field, cls):
                 default = default_value
                 if callable(default):
                     default = default()
-                comment = (
-                    'Value `%s` is selected as the default value for field `{new_model}.{new_field.name}` '
-                    'since the field is not null' % escaped_repr(default)
-                    )
                 break
     if default is None:
         comment = 'Check the field `{new_model}.{new_field.name}` does not contain null values'
-        return (comment, '', comment)
+        return comment, '', comment
     else:
         return (
             'Apply default value %s to the field {new_model}.{new_field.name}' % escaped_repr(default),
@@ -1035,7 +1034,7 @@ def set_not_null_helper(new_field, **kwargs):
         )
 
 
-def charfield_to_charfield_helper(old_field, new_field, **kwargs):
+def charfield_to_charfield_helper(old_field, new_field, **_):
     if old_field.max_length == new_field.max_length:
         return
     return (
@@ -1047,7 +1046,7 @@ def charfield_to_charfield_helper(old_field, new_field, **kwargs):
     )
 
 
-def field_to_charfield_helper(postgres=False, **kwargs):
+def field_to_charfield_helper(postgres=False, **_):
     typecast = 'VARCHAR' if postgres else 'CHAR'
     return (
         'Convert datatype of the field {new_model}.{new_field.name}: '
@@ -1059,7 +1058,7 @@ def field_to_charfield_helper(postgres=False, **kwargs):
     )
 
 
-def field_to_integer_helper(postgres=False, **kwargs):
+def field_to_integer_helper(postgres=False, **_):
     typecast = 'INTEGER' if postgres else 'SIGNED'
     return (
         'Convert datatype of the field {new_model}.{new_field.name}: '
@@ -1071,7 +1070,7 @@ def field_to_integer_helper(postgres=False, **kwargs):
     )
 
 
-def field_to_field_helper(**kwargs):
+def field_to_field_helper(**_):
     return (
         'Don\'t know how to do the conversion correctly, use the naive',
         '{new_model}.update({{{new_model}.{new_field.name}: {old_model}.{old_field.name}}})',
@@ -1257,9 +1256,7 @@ class Operations:
     @operation
     @model_field_args
     def add_not_null(self, model: peewee.Model, field: peewee.Field):
-        operations = []
-        operations.append(self._add_not_null(model, field))
-        return operations
+        return [self._add_not_null(model, field)]
 
     @operation
     @model_field_args

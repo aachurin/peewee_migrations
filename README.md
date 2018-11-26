@@ -2,7 +2,7 @@
 
 A simple and flexible migration manager for Peewee ORM.
 
-* **Version:** 0.3.9
+* **Version:** 0.3.14
 * **Status:** Development/Alpha
 * **Author:** Churin Andrey
 

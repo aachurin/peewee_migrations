@@ -1,22 +1,35 @@
+import os
+import re
 from setuptools import setup
-from os import path
-
-root_dir = path.abspath(path.dirname(__file__))
 
 
-with open(path.join(root_dir, 'README.md'), encoding='utf-8') as f:
-    long_description = f.read()
+def get_version(package):
+    """
+    Return package version as listed in `__version__` in `init.py`.
+    """
+    init_py = open(os.path.join(package, '__init__.py')).read()
+    return re.search("__version__ = ['\"]([^'\"]+)['\"]", init_py).group(1)
+
+
+def get_long_description(long_description_file):
+    with open(long_description_file, encoding='utf-8') as f:
+        long_description = f.read()
+
+    return long_description
+
+
+version = get_version('peewee_migrations')
 
 
 setup(
     name='peewee-migrations',
-    version='0.3.11',
+    version=version,
     url='https://github.com/aachurin/peewee_migrations',
     license='LGPL3',
     author='Andrey Churin',
     author_email='aachurin@gmail.com',
     description='Migration engine for peewee orm',
-    long_description=long_description,
+    long_description=get_long_description('README.md'),
     long_description_content_type='text/markdown',
     packages=['peewee_migrations'],
     zip_safe=False,
@@ -34,6 +47,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ],
     entry_points={
         'console_scripts': [

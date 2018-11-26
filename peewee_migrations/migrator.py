@@ -1054,7 +1054,7 @@ def field_to_charfield_helper(postgres=False, **_):
         '{new_model}.update({{{new_model}.{new_field.name}: '
         '{old_model}.{old_field.name}.cast(%r)}})'
         '.where({old_model}.{old_field.name}.is_null(False))' % typecast,
-        'Check the field `{new_model}.{new_field.name}` are correctly converted to string',
+        'Check the field `{new_model}.{new_field.name}` is converted correctly to string',
     )
 
 
@@ -1066,7 +1066,7 @@ def field_to_integer_helper(postgres=False, **_):
         '{new_model}.update({{{new_model}.{new_field.name}: '
         '{old_model}.{old_field.name}.cast(%r)}})'
         '.where({old_model}.{old_field.name}.is_null(False))' % typecast,
-        'Check the field `{new_model}.{new_field.name}` are correctly converted to integer',
+        'Check the field `{new_model}.{new_field.name}` is converted correctly to integer',
     )
 
 

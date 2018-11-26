@@ -147,22 +147,27 @@ def load_conf(ctx):
 
     databases = set()
     models = []
-    for m in conf['models']:
-        module, attr = m.rsplit('.', 1)
-        m = getattr(importlib.import_module(module), attr)
-        databases.add(m._meta.database)
-        models.append(m)
+    for model in conf['models']:
+        module, attr = model.rsplit('.', 1)
+        model = getattr(importlib.import_module(module), attr, None)
+        if not isinstance(model, type) or not issubclass(model, peewee.Model):
+            click.secho('%r: %r is not model' % (filename, model), fg='red')
+            sys.exit(3)
+        db = model._meta.database
+        if isinstance(db, peewee.Proxy):
+            db = db.obj
+        if db is None:
+            click.secho('%r: database is not specified for model %s' % (filename, m.__name__), fg='red')
+            sys.exit(3)
+        databases.add(db)
+        models.append(model)
     conf['models'] = models
 
     if len(databases) != 1:
-        click.secho('%r: ambiguous database' % filename, fg='red')
+        click.secho('%r: found multiple database instances, only one is supported' % filename, fg='red')
         sys.exit(3)
 
-    database = databases.pop()
-    if isinstance(database, peewee.Proxy):
-        database = database.obj
-
-    conf['db'] = database
+    conf['db'] = databases.pop()
 
     return conf
 

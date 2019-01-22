@@ -74,7 +74,7 @@ def get_constraints(constraints):
     result = []
     for c in constraints:
         if not isinstance(c, peewee.SQL):
-            raise TypeError('constraint must be SQL object')
+            raise TypeError('Constraint must be SQL object.')
         args = (c.sql, c.params) if c.params else (c.sql,)
         result.append(CallBlock('SQL', args))
     return result
@@ -169,7 +169,7 @@ class Column:
                 else:
                     path = param.__module__, param.__name__
                 if None in path:
-                    raise TypeError("Can't use %r as field argument" % param)
+                    raise TypeError("Can't use %r as field argument." % param)
                 self.modules.add(path[0])
                 params[k] = LiteralBlock('%s.%s' % path)
 
@@ -237,7 +237,7 @@ def deconstruct_foreignkey(field, params, complete):
 
 @deconstructor(peewee.DeferredForeignKey)
 def deconstruct_deferredforeignkey(field, **_):
-    raise TypeError("DeferredForeignKey '%s.%s' will not be resolved, use ForeignKeyField instead" % (
+    raise TypeError("DeferredForeignKey '%s.%s' will not be resolved, use ForeignKeyField instead." % (
         field.model.__name__, field.name))
 
 
@@ -274,7 +274,7 @@ class Snapshot:
                 if m._meta.name == model:
                     break
             else:
-                raise TypeError('model "%s" is used, but not included to MODELS' % model)
+                raise TypeError('Model "%s" is used, but not included to the watch list.' % model)
             return peewee.DeferredForeignKey(model, **kwargs)
 
 
@@ -302,7 +302,7 @@ class NodeDeconstructor:
             self.generic_code(node)
 
     def generic_code(self, node):
-        raise ValueError('unsupported node: % r' % node)
+        raise ValueError('Unsupported node: %r.' % node)
 
     @staticmethod
     def code_SQL(node):
@@ -633,7 +633,7 @@ class Router:
         try:
             steps, direction = self.storage.get_steps(migration)
         except KeyError:
-            raise MigrationError('unknown migration `%s`' % migration)
+            raise MigrationError('Unknown migration `%s`.' % migration)
         result_steps = []
         for name_from, name_to in steps:
             step_from = self.storage.read(name_from)
@@ -737,7 +737,7 @@ class Migrator:
         elif callable(obj):
             self.operations.append((PYOP(obj, args, kwargs), color, forced))
         else:
-            raise TypeError('Invalid operation')
+            raise TypeError('Invalid operation.')
 
     def run(self, fake=False):
         with self.database.transaction():
@@ -1164,7 +1164,7 @@ class Operations:
         elif isinstance(database, peewee.MySQLDatabase):
             return MySQLOperations(database)
         else:
-            raise NotImplementedError('sqlite is not supported')
+            raise NotImplementedError('Sqlite is not supported')
             # return SqliteOperations(database)
 
     def ctx(self):

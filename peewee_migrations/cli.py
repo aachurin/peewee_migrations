@@ -1,10 +1,13 @@
 import os
 import sys
-import click
-import importlib
-import peewee
+import types
 import json
+import importlib
+import importlib.util
 from traceback import format_exc
+
+import click
+import peewee
 from . migrator import Router, MigrationError
 
 
@@ -46,9 +49,47 @@ def init_config(filename):
     click.secho('Configuration file %r was created.' % filename, fg='green')
 
 
-def import_model(path):
-    module, attr = path.rsplit('.', 1)
-    return getattr(importlib.import_module(module), attr)
+def import_module(path):
+    attrs = []
+    while 1:
+        try:
+            module = importlib.import_module(path)
+            rest = '.'.join(reversed(attrs))
+            return module, rest
+        except ModuleNotFoundError as e:
+            try:
+                path, attr = path.rsplit('.', 1)
+            except ValueError:
+                raise e
+            attrs.append(attr)
+
+
+def import_string(path, module=None):
+    if module is None:
+        module, path = import_module(path)
+    ret = module
+    if path:
+        for attr in path.split('.'):
+            ret = getattr(ret, attr)
+    return ret
+
+
+def import_models(path):
+    module = import_string(path)
+    if isinstance(module, types.ModuleType):
+        if not getattr(module, '__watch_models__', None):
+            click.secho('Module %s has no __watch_models__ attribute.' % path, fg='red')
+            sys.exit(3)
+        models = [import_string(attr, module) for attr in module.__watch_models__]
+    else:
+        models = [module]
+
+    for model in models:
+        if not isinstance(model, type) or not issubclass(model, peewee.Model):
+            click.secho('Can\'t load model %s, not a peewee model' % model, fg='red')
+            sys.exit(3)
+
+    return models
 
 
 @cli.command()
@@ -69,19 +110,10 @@ def add(ctx, model):
     models = data.setdefault('models', [])
 
     if model in models:
-        click.secho('Model %r already in watch list.' % model, fg='red')
+        click.secho(' %r already in the watch list.' % model, fg='red')
         sys.exit(1)
 
-    try:
-        obj = import_model(model)
-    except Exception:
-        click.secho('Can`t add model %r to watch list.' % model, fg='red')
-        sys.exit(1)
-
-    if not isinstance(obj, type) or not issubclass(obj, peewee.Model):
-        click.secho('Can`t add model %r to watch list, not a model' % model, fg='red')
-        sys.exit(1)
-
+    import_models(model)
     models.append(model)
 
     with open(params['config'], 'wt') as f:
@@ -108,7 +140,7 @@ def remove(ctx, model):
     models = data.setdefault('models', [])
 
     if model not in models:
-        click.secho('Model %r is not in the watch list.' % model, fg='red')
+        click.secho('%r is not in the watch list.' % model, fg='red')
         sys.exit(1)
 
     models.remove(model)
@@ -116,7 +148,7 @@ def remove(ctx, model):
     with open(params['config'], 'wt') as f:
         json.dump(data, f, indent=2)
 
-    click.secho('Model %r was removed from the watch list.' % model, fg='green')
+    click.secho('%r was removed from the watch list.' % model, fg='green')
 
 
 def load_conf(ctx):
@@ -147,24 +179,21 @@ def load_conf(ctx):
 
     databases = set()
     models = []
-    for model in conf['models']:
-        module, attr = model.rsplit('.', 1)
-        model = getattr(importlib.import_module(module), attr, None)
-        if not isinstance(model, type) or not issubclass(model, peewee.Model):
-            click.secho('%r: %r is not model' % (filename, model), fg='red')
-            sys.exit(3)
-        db = model._meta.database
-        if isinstance(db, peewee.Proxy):
-            db = db.obj
-        if db is None:
-            click.secho('%r: database is not specified for model %s' % (filename, m.__name__), fg='red')
-            sys.exit(3)
-        databases.add(db)
-        models.append(model)
+    for path in conf['models']:
+        for model in import_models(path):
+            db = model._meta.database
+            if isinstance(db, peewee.Proxy):
+                db = db.obj
+            if db is None:
+                click.secho('Database is not specified for model %s.' % model.__name__, fg='red')
+                sys.exit(3)
+            databases.add(db)
+            models.append(model)
+
     conf['models'] = models
 
     if len(databases) != 1:
-        click.secho('%r: found multiple database instances, only one is supported' % filename, fg='red')
+        click.secho('%r: found multiple database instances, only one is supported.' % filename, fg='red')
         sys.exit(3)
 
     conf['db'] = databases.pop()

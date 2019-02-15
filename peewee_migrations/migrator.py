@@ -270,7 +270,9 @@ class Snapshot:
         if model in self.mapping:
             return peewee.ForeignKeyField(self.mapping[model], **kwargs)
         else:
+            print('Check')
             for m in self.models:
+                print(m._meta.name)
                 if m._meta.name == model:
                     break
             else:

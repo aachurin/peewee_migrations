@@ -97,3 +97,16 @@ $ pem show
 ```
 
 For more information on using the commands see --help.
+
+## migrations.json
+```json
+{
+  "prerun": "some code here",  // some code to run before executing any command
+  "directory": "migrations",   // folder to hold migrations
+  "history": "migratehistory", // table to hold migration history
+  "models": [                  // list of models to watch
+    "module1.Model1",
+    "module2.Model2"
+  ]
+}
+```

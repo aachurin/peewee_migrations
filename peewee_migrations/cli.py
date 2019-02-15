@@ -74,22 +74,30 @@ def import_string(path, module=None):
     return ret
 
 
-def import_models(path):
-    module = import_string(path)
-    if isinstance(module, types.ModuleType):
-        if not getattr(module, '__watch_models__', None):
-            click.secho('Module %s has no __watch_models__ attribute.' % path, fg='red')
-            sys.exit(3)
-        models = [import_string(attr, module) for attr in module.__watch_models__]
+def import_models(path, *, seen=None):
+    if isinstance(path, str):
+        obj = import_string(path)
     else:
-        models = [module]
+        obj = path
 
-    for model in models:
-        if not isinstance(model, type) or not issubclass(model, peewee.Model):
-            click.secho('Can\'t load model %s, not a peewee model' % model, fg='red')
-            sys.exit(3)
+    seen = seen or set()
 
-    return models
+    if obj not in seen and hasattr(obj, '__watch_models__'):
+        seen.add(obj)
+        watch = obj.__watch_models__
+        if callable(watch):
+            watch = watch()
+        for obj in watch:
+            if isinstance(obj, str) and obj.startswith('.'):
+                obj = path + obj
+            yield from import_models(obj, seen=seen)
+        return
+
+    if not isinstance(obj, type) or not issubclass(obj, peewee.Model):
+        click.secho('Can\'t load model %s, not a peewee model' % obj, fg='red')
+        sys.exit(3)
+
+    yield obj
 
 
 @cli.command()

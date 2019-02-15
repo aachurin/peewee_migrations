@@ -2,7 +2,7 @@
 
 A simple and flexible migration manager for Peewee ORM.
 
-* **Version:** 0.3.15
+* **Version:** 0.3.16
 * **Status:** Development/Alpha
 * **Author:** Churin Andrey
 
@@ -39,7 +39,7 @@ class Foo(db.Model):
 Add this model to the watch list and create migration.
 
 ```bash
-$ pem add models.Tweet
+$ pem add models.Foo
 Model 'models.Foo' was added to the watch list.
 $ pem watch
 Migration `0001_migration_201807191008` has been created.
@@ -99,7 +99,7 @@ $ pem show
 For more information on using the commands see --help.
 
 ## migrations.json
-```json
+```
 {
   "prerun": "some code here",  // some code to run before executing any command
   "directory": "migrations",   // folder to hold migrations

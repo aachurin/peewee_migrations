@@ -874,11 +874,12 @@ class Migrator:
             self.add_data_migration_hints(field, None, False)
 
         for field1, field2 in state.check_fields:
+            # XXX: hack
+            field1.model = field2.model
             if field1.column_name != field2.column_name:
                 self.op.rename_column(field1, field2.column_name)
                 field1.column_name = field2.column_name
 
-        for field1, field2 in state.check_fields:
             if self._field_type(field1) != self._field_type(field2):
                 old_column_name = 'old__' + field1.column_name
                 self.op.rename_column(field1, old_column_name)
@@ -940,13 +941,15 @@ class Migrator:
             run_helper(set_not_null_helper, None, field1, self.backward_hints)
 
         if type_changed:
-            for (tp1, tp2), helper in DATA_MIGRATE_HELPERS:
-                if isinstance(field1, tp1) and isinstance(field2, tp2):
+            field_check1 = field1.rel_field if isinstance(field1, peewee.ForeignKeyField) else field1
+            field_check2 = field2.rel_field if isinstance(field2, peewee.ForeignKeyField) else field2
+            for (tp1, tp2), helper in DATA_MIGRATE_HINTS:
+                if isinstance(field_check1, tp1) and isinstance(field_check2, tp2):
                     run_helper(helper, field1, field2, self.forward_hints)
                     break
 
-            for (tp1, tp2), helper in DATA_MIGRATE_HELPERS:
-                if isinstance(field2, tp1) and isinstance(field1, tp2):
+            for (tp1, tp2), helper in DATA_MIGRATE_HINTS:
+                if isinstance(field_check2, tp1) and isinstance(field_check1, tp2):
                     run_helper(helper, field2, field1, self.backward_hints)
                     break
 
@@ -1079,7 +1082,7 @@ def field_to_field_helper(**_):
     )
 
 
-DATA_MIGRATE_HELPERS = [
+DATA_MIGRATE_HINTS = [
     ((peewee.CharField, peewee.CharField), charfield_to_charfield_helper),
     ((peewee.Field, peewee.CharField), field_to_charfield_helper),
     ((peewee.Field, peewee.IntegerField), field_to_integer_helper),

@@ -270,9 +270,7 @@ class Snapshot:
         if model in self.mapping:
             return peewee.ForeignKeyField(self.mapping[model], **kwargs)
         else:
-            print('Check')
             for m in self.models:
-                print(m._meta.name)
                 if m._meta.name == model:
                     break
             else:
@@ -1075,9 +1073,9 @@ def field_to_integer_helper(postgres=False, **_):
 def field_to_field_helper(**_):
     return (
         'Don\'t know how to do the conversion correctly, use the naive',
-        '{new_model}.update({{{new_model}.{new_field.name}: {old_model}.{old_field.name}}})',
+        '{new_model}.update({{{new_model}.{new_field.name}: {old_model}.{old_field.name}}})'
         '.where({old_model}.{old_field.name}.is_null(False))',
-        'Check the field `{new_model}.{new_field.name}` are correctly converted',
+        'Check the field `{new_model}.{new_field.name}` is correctly converted',
     )
 
 

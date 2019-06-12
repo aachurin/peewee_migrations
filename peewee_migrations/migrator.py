@@ -5,7 +5,11 @@ import textwrap
 import decimal
 from datetime import datetime, date, time
 from collections import OrderedDict, namedtuple
-from playhouse.postgres_ext import ArrayField
+
+try:
+    from playhouse.postgres_ext import ArrayField as PgArrayField
+except ImportError:
+    PgArrayField = None
 
 
 __all__ = ('Router', 'Snapshot', 'Migrator', 'MigrationError', 'deconstructor')
@@ -198,11 +202,12 @@ def decimalfield_deconstructor(field, params, **_):
     params['rounding'] = field.rounding
 
 
-@deconstructor(ArrayField)
-def arrayfield_deconstructor(field, params, **_):
-    params['dimensions'] = field.dimensions
-    params['convert_values'] = field.convert_values
-    params['field_class'] = field._ArrayField__field.__class__
+if PgArrayField:
+    @deconstructor(PgArrayField)
+    def arrayfield_deconstructor(field, params, **_):
+        params['dimensions'] = field.dimensions
+        params['convert_values'] = field.convert_values
+        params['field_class'] = field._ArrayField__field.__class__
 
 
 @deconstructor(peewee.ForeignKeyField)

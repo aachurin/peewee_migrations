@@ -3,6 +3,7 @@ import re
 import peewee
 import textwrap
 import decimal
+import enum
 from datetime import datetime, date, time
 from collections import OrderedDict, namedtuple
 
@@ -84,6 +85,12 @@ def get_constraints(constraints):
     return result
 
 
+def value_repr(value):
+    if isinstance(value, enum.Enum):
+        return repr(value.value)
+    return repr(value)
+
+
 class Column:
 
     __slots__ = ('modules', 'field_class', 'name', '__dict__')
@@ -111,7 +118,7 @@ class Column:
 
     def to_code(self):
         params = self.__dict__
-        param_str = ', '.join('%s=%r' % (k, v) for k, v in sorted(params.items()))
+        param_str = ', '.join('%s=%s' % (k, value_repr(v)) for k, v in sorted(params.items()))
         if issubclass(self.field_class, peewee.ForeignKeyField):
             name = 'snapshot.ForeignKeyField'
         else:
@@ -1340,13 +1347,13 @@ class PostgresqlOperations(Operations):
                   model._meta.schema or 'public')
 
         def get_name():
-            sql = """
-                SELECT DISTINCT tc.constraint_name
-                FROM information_schema.table_constraints AS tc
-                WHERE tc.constraint_type = 'PRIMARY KEY' AND
-                      tc.table_name = %s AND
-                      tc.table_schema = %s
-                """
+            sql = (
+                "SELECT DISTINCT tc.constraint_name "
+                "FROM information_schema.table_constraints AS tc "
+                "WHERE tc.constraint_type = 'PRIMARY KEY' AND "
+                "tc.table_name = %s AND "
+                "tc.table_schema = %s"
+            )
             cursor = self.database.execute_sql(sql, params)
             result = cursor.fetchall()
             return peewee.Entity(result[0][0] if result else '<PRIMARY KEY>')
@@ -1365,24 +1372,24 @@ class PostgresqlOperations(Operations):
                   field.rel_field.column_name)
 
         def get_name():
-            sql = """
-                SELECT tc.constraint_name
-                FROM information_schema.table_constraints AS tc
-                JOIN information_schema.key_column_usage AS kcu
-                    ON (tc.constraint_name = kcu.constraint_name AND
-                        tc.constraint_schema = kcu.constraint_schema)
-                JOIN information_schema.constraint_column_usage AS ccu
-                    ON (ccu.constraint_name = tc.constraint_name AND
-                        ccu.constraint_schema = tc.constraint_schema)
-                WHERE
-                    tc.constraint_type = 'FOREIGN KEY' AND
-                    tc.table_name = %s AND
-                    tc.table_schema = %s AND
-                    ccu.table_name = %s AND
-                    ccu.table_schema = %s AND
-                    kcu.column_name = %s AND
-                    ccu.column_name = %s
-            """
+            sql = (
+                "SELECT tc.constraint_name "
+                "FROM information_schema.table_constraints AS tc "
+                "JOIN information_schema.key_column_usage AS kcu "
+                "ON (tc.constraint_name = kcu.constraint_name AND "
+                "tc.constraint_schema = kcu.constraint_schema) "
+                "JOIN information_schema.constraint_column_usage AS ccu "
+                "ON (ccu.constraint_name = tc.constraint_name AND "
+                "ccu.constraint_schema = tc.constraint_schema) "
+                "WHERE "
+                "tc.constraint_type = 'FOREIGN KEY' AND "
+                "tc.table_name = %s AND "
+                "tc.table_schema = %s AND "
+                "ccu.table_name = %s AND "
+                "ccu.table_schema = %s AND "
+                "kcu.column_name = %s AND "
+                "ccu.column_name = %s"
+            )
             cursor = self.database.execute_sql(sql, params)
             result = cursor.fetchall()
             return peewee.Entity(result[0][0] if result else '<FOREIGN KEY>')
@@ -1441,15 +1448,15 @@ class MySQLOperations(Operations):
                   field.rel_field.column_name)
 
         def get_name():
-            sql = """
-                SELECT constraint_name
-                FROM information_schema.key_column_usage
-                WHERE table_name = %s
-                    AND column_name = %s
-                    AND table_schema = DATABASE()
-                    AND referenced_table_name = %s
-                    AND referenced_column_name = %s
-            """
+            sql = (
+                "SELECT constraint_name " 
+                "FROM information_schema.key_column_usage "
+                "WHERE table_name = %s "
+                "AND column_name = %s "
+                "AND table_schema = DATABASE() "
+                "AND referenced_table_name = %s "
+                "AND referenced_column_name = %s"
+            )
             cursor = self.database.execute_sql(sql, params)
             result = cursor.fetchall()
             return peewee.Entity(result[0][0] if result else '<FOREIGN KEY>')

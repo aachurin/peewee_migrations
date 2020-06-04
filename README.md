@@ -11,6 +11,9 @@ A simple and flexible migration manager for Peewee ORM.
 * python >= 3.5
 * latest peewee
 
+## Note
+SQLite is not supported.
+
 
 ## Quick start
 

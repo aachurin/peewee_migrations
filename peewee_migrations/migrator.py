@@ -60,12 +60,16 @@ class CallBlock:
                 and self.kwargs == other.kwargs)
 
     def __repr__(self):
+        repr_result = f'{self.fn}'
+
         params = []
         if self.args:
             params += [repr(p) for p in self.args]
         if self.kwargs:
             params += ['%s=%r' % (k, v) for k, v in self.kwargs.items()]
-        return '%s(%s)' % (self.fn, ', '.join(params))
+        if params:
+            repr_result = f'{repr_result}({", ".join(params)})'
+        return repr_result
 
 
 def deconstructor(field_class):
@@ -321,6 +325,10 @@ class NodeDeconstructor:
         return CallBlock('SQL', args=(node.sql, node.params))
 
     @staticmethod
+    def code_Entity(node):
+        return '.'.join(node._path)
+
+    @staticmethod
     def code_Table(node):
         kwargs = {'name': node.__name__}
         if node._schema:
@@ -339,7 +347,8 @@ class NodeDeconstructor:
             kwargs['safe'] = True
         if node._using:
             kwargs['using'] = node._using
-        assert node._where is None
+        if node._where:
+            kwargs['where'] = self.get_code(node._where)
         return CallBlock('Index', kwargs=kwargs)
 
     def code_Expression(self, node):

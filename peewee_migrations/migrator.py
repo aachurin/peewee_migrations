@@ -8,9 +8,15 @@ from datetime import datetime, date, time
 from collections import OrderedDict, namedtuple
 
 try:
-    from playhouse.postgres_ext import ArrayField as PgArrayField
+    from playhouse.postgres_ext import (
+        ArrayField as PgArrayField,
+        HStoreField as PgHStoreField,
+        BinaryJSONField as PgBinaryJSONField,
+        TSVectorField as PgTSVectorField,
+    )
+
 except ImportError:
-    PgArrayField = None
+    PgArrayField = PgHStoreField = PgBinaryJSONField = PgTSVectorField = None
 
 
 __all__ = ("Router", "Snapshot", "Migrator", "MigrationError", "deconstructor")
@@ -221,6 +227,24 @@ if PgArrayField:
         params["dimensions"] = field.dimensions
         params["convert_values"] = field.convert_values
         params["field_class"] = field._ArrayField__field.__class__
+
+
+if PgHStoreField:
+    @deconstructor(PgHStoreField)
+    def hstorefield_deconstructor(field, params, **_):
+        params['index'] = field.index
+
+
+if PgBinaryJSONField:
+    @deconstructor(PgBinaryJSONField)
+    def binaryjsonfield_deconstructor(field, params, **_):
+        params['index'] = field.index
+
+
+if PgTSVectorField:
+    @deconstructor(PgTSVectorField)
+    def tsvectorfield_deconstructor(field, params, **_):
+        params['index'] = field.index
 
 
 @deconstructor(peewee.ForeignKeyField)

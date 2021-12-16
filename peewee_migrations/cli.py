@@ -242,8 +242,9 @@ def droptables(ctx):
 @cli.command()
 @click.option('--traceback', is_flag=True, help='Show traceback')
 @click.option('--tracecode', is_flag=True, help='Show generated code')
+@click.option('--serialize', is_flag=True, help='Show generated code')
 @click.pass_context
-def watch(ctx, traceback, tracecode):
+def watch(ctx, traceback, tracecode, serialize):
     """Watch model changes and create migration"""
 
     router = load_router(ctx)
@@ -252,7 +253,7 @@ def watch(ctx, traceback, tracecode):
     else:
         context = None
     try:
-        result = router.create(tracecode=context)
+        result = router.create(tracecode=context, serialize=serialize)
     except Exception as e:
         click.secho('Migration error: ' + str(e), fg='red')
         if tracecode and context.get('code'):
@@ -286,15 +287,17 @@ def list_(ctx):
 
 
 @cli.command()
-@click.option('-t', '--to', default=None, help='target migration')
+@click.argument('to', required=False, default=None)
+@click.option('-n', '--autocommit', default=False, is_flag=True, help='run without a transaction')
+@click.option('-s', '--skip', default=0, type=int, help='skip first N operations')
 @click.pass_context
-def show(ctx, to):
+def show(ctx, to, autocommit, skip):
     """Show migrations"""
 
     router = load_router(ctx)
-
+    atomic = not autocommit
     try:
-        steps = router.migrate(to)
+        steps = router.migrate(to, atomic=atomic)
     except MigrationError as e:
         click.secho('Migration error: ' + str(e), fg='red')
         sys.exit(1)
@@ -304,31 +307,45 @@ def show(ctx, to):
         return
 
     for step in steps:
-        if step.direction == 'forward':
-            click.secho('[ ] ' + step.name + ':', fg='yellow')
+        if step.run_serialized:
+            serialized = ' (serialized)'
         else:
-            click.secho('[X] ' + step.name + ':', fg='green')
-        for op, color, _ in step.get_ops():
-            if color == 'ALERT':
-                click.secho('  %s' % op.description, fg='magenta')
+            serialized = ''
+        if step.direction == 'forward':
+            click.secho('[ ] ' + step.name + serialized + ':', fg='yellow')
+        else:
+            click.secho('[X] ' + step.name + serialized + ':', fg='green')
+        for idx, (op, color, _) in enumerate(step.get_ops()):
+            if idx >= skip:
+                prefix = "[*]"
             else:
-                click.secho('  %s' % op.description, fg='cyan')
+                prefix = "[ ]"
+            if color == 'ALERT':
+                click.secho('  %s %s' % (prefix, op.description), fg='magenta')
+            else:
+                click.secho('  %s %s' % (prefix, op.description), fg='cyan')
         click.echo('')
 
 
 @cli.command()
-@click.option('-f', '--fake', default=False, is_flag=True, help='fake migration')
 @click.argument('to', required=False, default=None)
+@click.option('-f', '--fake', default=False, is_flag=True, help='fake migration')
+@click.option('-s', '--skip', default=0, type=int, help='skip first N operations')
+@click.option('-a', '--autocommit', default=False, is_flag=True, help='run without a transaction')
+@click.option('--traceback', is_flag=True, help='Show traceback')
 @click.pass_context
-def migrate(ctx, to, fake):
+def migrate(ctx, to, fake, skip, autocommit, traceback):
     """Run migrations"""
 
     router = load_router(ctx)
 
+    atomic = not autocommit
     try:
-        steps = router.migrate(to)
+        steps = router.migrate(to, atomic=atomic)
     except MigrationError as e:
         click.secho('Migration error: ' + str(e), fg='red')
+        if traceback:
+            click.secho(format_exc(), fg='yellow', bold=True)
         sys.exit(1)
 
     if not steps:
@@ -336,11 +353,32 @@ def migrate(ctx, to, fake):
         return
 
     for step in steps:
-        step.run(fake=fake)
-        if step.direction == 'forward':
-            click.secho('[X] ' + step.name, fg='green')
+        if step.run_serialized:
+            serialized = ' (serialized)'
         else:
-            click.secho('[ ] ' + step.name, fg='yellow')
+            serialized = ''
+        if step.direction == 'forward':
+            click.secho('[X] ' + step.name + serialized, fg='green')
+        else:
+            click.secho('[ ] ' + step.name + serialized, fg='yellow')
+        try:
+            for descr, color, skipped in step.run(fake=fake, skip=skip):
+                if skipped:
+                    prefix = "[ ]"
+                else:
+                    prefix = "[*]"
+                if color == 'ALERT':
+                    click.secho('  %s %s' % (prefix, descr), fg='magenta')
+                else:
+                    click.secho('  %s %s' % (prefix, descr), fg='cyan')
+            skip = 0
+            click.echo('')
+        except MigrationError as e:
+            click.secho('  [!] %s' % e.args[1], fg='red')
+            click.echo('')
+            click.secho('Migration error: ' + e.args[0], fg='red')
+            if traceback:
+                click.secho(format_exc(), fg='yellow', bold=True)
 
 
 def run():

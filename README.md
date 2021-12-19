@@ -99,6 +99,61 @@ $ pem show
   PY>  set_done('0002_migration_201807191036')
 ```
 
+It's possible to create "serialized" migrations, run `pem watch --serialize`. In this case, explicit migration functions will be additionally created.
+
+```bash
+$ pem watch --serialize
+Migration `0001_migration_202112161523` has been created.
+```
+
+Additional code will be generated
+
+```python
+...
+
+def migrate_forward(op, old_orm, new_orm):
+    op.create_table(new_orm.foo)
+
+
+def migrate_backward(op, old_orm, new_orm):
+    op.drop_table(old_orm.foo)
+```
+
+And after changing the model
+
+```bash
+$ pem watch --serialize
+Migration `0002_migration_202112161527` has been created.
+```
+
+```python
+...
+
+def migrate_forward(op, old_orm, new_orm):
+    op.add_column(new_orm.foo.xyzzy)
+    op.rename_column(new_orm.foo.bar, 'old__bar')
+    op.add_column(new_orm.foo.bar)
+    op.run_data_migration()
+    op.drop_column(new_orm.foo.bar)
+    op.add_not_null(new_orm.foo.xyzzy)
+    op.add_not_null(new_orm.foo.bar)
+
+...
+
+def migrate_backward(op, old_orm, new_orm):
+    op.rename_column(old_orm.foo.bar, 'old__bar')
+    op.rename_column(old_orm.foo.bar, 'old__old__bar')
+    op.add_column(old_orm.foo.bar)
+    op.run_data_migration()
+    op.drop_column(old_orm.foo.xyzzy)
+    op.drop_column(old_orm.foo.bar)
+    op.add_not_null(old_orm.foo.bar)
+```
+
+Serialized migrations are performed only according to the operations specified in the migrate functions.
+
+To run migrations without a transaction, use `pem migrate --autocommit`. To view a list of operations that will be performed in this mode, use `pem show --autocommit` (some operations may differ).
+
 For more information on using the commands see --help.
 
 ## migrations.json

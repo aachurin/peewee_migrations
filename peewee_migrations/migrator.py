@@ -793,7 +793,7 @@ class Migrator:
             self.compute_hints = False
 
         if run_data_migration:
-            data_migration = lambda: run_data_migration(self.old_orm, self.new_orm)
+            data_migration = lambda: run_data_migration(old_orm=self.old_orm, new_orm=self.new_orm)
         else:
             data_migration = None
 
@@ -854,7 +854,7 @@ class Migrator:
 
     def migrate(self):
         if self.run_serialized:
-            return self.run_serialized(self.recorder, self.old_orm, self.new_orm)
+            return self.run_serialized(op=self.recorder, old_orm=self.old_orm, new_orm=self.new_orm)
 
         models1 = peewee.sort_models(list(self.old_orm))
         models2 = peewee.sort_models(list(self.new_orm))
@@ -876,6 +876,8 @@ class Migrator:
         models_to_migrate = [(models1[name], models2[name]) for name in models1 if name in models2]
         if models_to_migrate:
             self._migrate_models(models_to_migrate)
+        else:
+            self.recorder.run_data_migration()
 
         # Remove models
         for name in [m for m in reversed(models1) if m not in models2]:
@@ -926,8 +928,6 @@ class Migrator:
             self._update_model(state[pair], *pair)
 
         self.recorder.run_data_migration()
-        # ops = list(self.run_data_migration(new_orm=self.new_orm, old_orm=self.old_orm))
-        # self.add_operation(ops, color='ALERT')
 
         for pair in pairs:
             self._cleanup_model(state[pair], *pair)

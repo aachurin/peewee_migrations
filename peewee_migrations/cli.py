@@ -379,7 +379,7 @@ def migrate(ctx, to, fake, skip, autocommit, traceback):
             click.secho('Migration error: ' + e.args[0], fg='red')
             if traceback:
                 click.secho(format_exc(), fg='yellow', bold=True)
-
+            raise
 
 def run():
     cli()

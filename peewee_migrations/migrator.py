@@ -837,16 +837,19 @@ class Migrator:
         else:
             raise TypeError('Invalid operation.')
 
-    def run(self, fake=False, skip=0):
-        with self.op.transaction():
-            for idx, (op, color, forced) in enumerate(self.operations):
-                try:
-                    can_run = forced or (not fake and idx >= skip)
-                    if can_run:
+    def run(self, fake=False, skip=0, ignore_errors=False):
+        for idx, (op, color, forced) in enumerate(self.operations):
+            try:
+                can_run = forced or (not fake and idx >= skip)
+                if can_run:
+                    with self.op.transaction():
                         op.run()
-                    yield op.description, color, not can_run
-                except Exception as e:
+                yield op.description, color, not can_run
+            except Exception as e:
+                if not ignore_errors:
                     raise MigrationError(str(e), op.description)
+                else:
+                    yield op.description + ": " + str(e), 'ERROR', True
         self.operations = []
 
     def get_ops(self):
@@ -1466,7 +1469,7 @@ class LazyQuery(peewee.Node):
                 if value not in self.computed:
                     self.computed[value] = value()
                 value = self.computed[value]
-            getattr(ctx, attr)(value)
+            ctx = getattr(ctx, attr)(value)
         return ctx
 
 
@@ -1518,9 +1521,7 @@ class PostgresqlOperations(Operations):
                     .literal(' TO ')
                     .sql(column_to))
 
-    def _get_primary_key_constraint_name(self, model):
-        params = (model._meta.table_name,
-                  model._meta.schema or 'public')
+    def _get_primary_key_constraint_name(self, table_name, schema):
         sql = (
             "SELECT DISTINCT tc.constraint_name "
             "FROM information_schema.table_constraints AS tc "
@@ -1528,36 +1529,40 @@ class PostgresqlOperations(Operations):
             "tc.table_name = %s AND "
             "tc.table_schema = %s"
         )
-        cursor = self._database.execute_sql(sql, params)
+        cursor = self._database.execute_sql(sql, (table_name, schema))
         result = cursor.fetchall()
         return peewee.Entity(result[0][0] if result else '?')
 
     def _drop_primary_key_constraint(self, model):
+        table_name = model._meta.table_name
+        schema = model._meta.schema or 'public'
         return (lazy_query().literal('ALTER TABLE ')
-                            .sql(model._meta.table)
+                            .sql(peewee.Entity(table_name))
                             .literal(' DROP CONSTRAINT ')
-                            .sql(lambda: self._get_primary_key_constraint_name(model)))
+                            .sql(lambda: self._get_primary_key_constraint_name(table_name, schema)))
 
     def _add_foreign_key_constraint(self, model, field):
         if self._atomic:
             return super()._add_foreign_key_constraint(model, field)
 
+        table_name = model._meta.table_name
+        schema = model._meta.schema or 'public'
+        rel_table_name = field.rel_model._meta.table_name
+        rel_schema = field.rel_model._meta.schema or 'public'
+        column_name = field.column_name
+        rel_column_name = field.rel_field.column_name
         return [
             super()._add_foreign_key_constraint(model, field).literal(' NOT VALID'),
             lazy_query().literal('ALTER TABLE ')
-                        .sql(model._meta.table)
+                        .sql(peewee.Entity(table_name))
                         .literal(' VALIDATE CONSTRAINT ')
-                        .sql(lambda: self._get_foreign_key_constraint_name(model, field))
+                        .sql(lambda: self._get_foreign_key_constraint_name(
+                            table_name, schema, column_name, rel_table_name, rel_schema, rel_column_name
+                        ))
         ]
 
-    def _get_foreign_key_constraint_name(self, model, field):
-        params = (model._meta.table_name,
-                  model._meta.schema or 'public',
-                  field.rel_model._meta.table_name,
-                  field.rel_model._meta.schema or 'public',
-                  field.column_name,
-                  field.rel_field.column_name)
-
+    def _get_foreign_key_constraint_name(self, table_name, schema, column_name,
+                                         rel_table_name, rel_schema, rel_column_name):
         sql = (
             "SELECT tc.constraint_name "
             "FROM information_schema.table_constraints AS tc "
@@ -1576,15 +1581,24 @@ class PostgresqlOperations(Operations):
             "kcu.column_name = %s AND "
             "ccu.column_name = %s"
         )
-        cursor = self._database.execute_sql(sql, params)
+        cursor = self._database.execute_sql(sql, (table_name, schema, rel_table_name, rel_schema,
+                                                  column_name, rel_column_name))
         result = cursor.fetchall()
         return peewee.Entity(result[0][0] if result else '?')
 
     def _drop_foreign_key_constraint(self, model, field):
+        table_name = model._meta.table_name
+        schema = model._meta.schema or 'public'
+        rel_table_name = field.rel_model._meta.table_name
+        rel_schema = field.rel_model._meta.schema or 'public'
+        column_name = field.column_name
+        rel_column_name = field.rel_field.column_name
         return (lazy_query().literal('ALTER TABLE ')
-                            .sql(model._meta.table)
+                            .sql(peewee.Entity(table_name))
                             .literal(' DROP CONSTRAINT ')
-                            .sql(lambda: self._get_foreign_key_constraint_name(model, field)))
+                            .sql(lambda: self._get_foreign_key_constraint_name(
+                                    table_name, schema, column_name, rel_table_name, rel_schema, rel_column_name
+                            )))
 
 
 class MySQLOperations(Operations):
@@ -1628,11 +1642,7 @@ class MySQLOperations(Operations):
         operations.append(self.alter_table(model).literal(' DROP PRIMARY KEY'))
         return operations
 
-    def _get_foreign_key_constraint_name(self, model, field):
-        params = (model._meta.table_name,
-                  field.column_name,
-                  field.rel_model._meta.table_name,
-                  field.rel_field.column_name)
+    def _get_foreign_key_constraint_name(self, table_name, column_name, rel_table_name, rel_column_name):
         sql = (
             "SELECT constraint_name "
             "FROM information_schema.key_column_usage "
@@ -1642,15 +1652,21 @@ class MySQLOperations(Operations):
             "AND referenced_table_name = %s "
             "AND referenced_column_name = %s"
         )
-        cursor = self._database.execute_sql(sql, params)
+        cursor = self._database.execute_sql(sql, (table_name, column_name, rel_table_name, rel_column_name))
         result = cursor.fetchall()
         return peewee.Entity(result[0][0] if result else '?')
 
     def _drop_foreign_key_constraint(self, model, field):
+        table_name = model._meta.table_name
+        column_name = field.column_name
+        rel_table_name = field.rel_model._meta.table_name
+        rel_column_name = field.rel_field.column_name
         return (lazy_query().literal('ALTER TABLE ')
-                            .sql(model._meta.table)
+                            .sql(peewee.Entity(table_name))
                             .literal(' DROP FOREIGN KEY ')
-                            .sql(lambda: self._get_foreign_key_constraint_name(model, field)))
+                            .sql(lambda: self._get_foreign_key_constraint_name(
+                                        table_name, column_name, rel_table_name, rel_column_name
+                            )))
 
     def _get_primary_key_field(self, field):
         if isinstance(field, peewee.AutoField):

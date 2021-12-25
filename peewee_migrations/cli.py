@@ -288,7 +288,7 @@ def list_(ctx):
 
 @cli.command()
 @click.argument('to', required=False, default=None)
-@click.option('-n', '--autocommit', default=False, is_flag=True, help='run without a transaction')
+@click.option('-a', '--autocommit', default=False, is_flag=True, help='run without a transaction')
 @click.option('-s', '--skip', default=0, type=int, help='skip first N operations')
 @click.pass_context
 def show(ctx, to, autocommit, skip):
@@ -332,9 +332,10 @@ def show(ctx, to, autocommit, skip):
 @click.option('-f', '--fake', default=False, is_flag=True, help='fake migration')
 @click.option('-s', '--skip', default=0, type=int, help='skip first N operations')
 @click.option('-a', '--autocommit', default=False, is_flag=True, help='run without a transaction')
+@click.option('-i', '--ignore-errors', default=False, is_flag=True, help='ignore errors and try to continue')
 @click.option('--traceback', is_flag=True, help='Show traceback')
 @click.pass_context
-def migrate(ctx, to, fake, skip, autocommit, traceback):
+def migrate(ctx, to, fake, skip, autocommit, traceback, ignore_errors):
     """Run migrations"""
 
     router = load_router(ctx)
@@ -362,13 +363,15 @@ def migrate(ctx, to, fake, skip, autocommit, traceback):
         else:
             click.secho('[ ] ' + step.name + serialized, fg='yellow')
         try:
-            for descr, color, skipped in step.run(fake=fake, skip=skip):
+            for descr, color, skipped in step.run(fake=fake, skip=skip, ignore_errors=ignore_errors):
                 if skipped:
                     prefix = "[ ]"
                 else:
                     prefix = "[*]"
                 if color == 'ALERT':
                     click.secho('  %s %s' % (prefix, descr), fg='magenta')
+                elif color == 'ERROR':
+                    click.secho('  %s %s' % (prefix, descr), fg='red')
                 else:
                     click.secho('  %s %s' % (prefix, descr), fg='cyan')
             skip = 0

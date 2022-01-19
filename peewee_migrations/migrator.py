@@ -1500,6 +1500,12 @@ class PostgresqlOperations(Operations):
             query._sql[0] += "CONCURRENTLY "
         return query
 
+    def _drop_index(self, model, index):
+        query = super()._add_index(model, index)
+        if not self._atomic:
+            query._sql[0] += "CONCURRENTLY "
+        return query
+
     def _add_not_null(self, model, field):
         return (self.alter_table(model)
                     .literal(' ALTER COLUMN ')

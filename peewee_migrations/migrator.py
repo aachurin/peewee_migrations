@@ -981,7 +981,7 @@ class Migrator:
 
         for field1, field2 in state.check_fields:
             # XXX: hack
-            field1.model = field2.model
+            # field1.model = field2.model
             if field1.column_name != field2.column_name:
                 self.recorder.rename_column(field1, field2.column_name)
                 field1.column_name = field2.column_name
@@ -1501,7 +1501,7 @@ class PostgresqlOperations(Operations):
         return query
 
     def _drop_index(self, model, index):
-        query = super()._add_index(model, index)
+        query = super()._drop_index(model, index)
         if not self._atomic:
             query._sql[0] += "CONCURRENTLY "
         return query

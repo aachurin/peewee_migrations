@@ -795,7 +795,6 @@ class Migrator:
             self.backward_hints = MigrateCode(('old_orm', 'new_orm'))
         else:
             self.compute_hints = False
-
         self.op = get_operations_for_db(database, atomic=atomic, data_migration=run_data_migration,
                                         old_orm=old_orm, new_orm=new_orm, explicit_schema=explicit_schema)
 
@@ -803,28 +802,6 @@ class Migrator:
             self.recorder = OperationSerializer(self.op, self.old_orm, self.new_orm, self.serialized.add_operation)
         else:
             self.recorder = OperationRecorder(self.op, self.add_operation)
-
-    # @classmethod
-    # def add_hint(cls, type1, type2, *tests, final=True):
-    #     if type1 is None:
-    #         def f1(_): return True
-    #     else:
-    #         def f1(obj): return isinstance(obj.old_field, type1)
-    #     if type2 is None:
-    #         def f2(_): return True
-    #     else:
-    #         def f2(obj): return isinstance(obj.new_field, type2)
-    #     assert all(callable(x) for x in tests)
-    #
-    #     def appender(fn):
-    #         cls.hints.append(
-    #             HintDescription(
-    #                 test=(lambda obj: f1(obj) and f2(obj) and all(f(obj) for f in tests)),
-    #                 exec=fn,
-    #                 final=final
-    #             ))
-    #         return fn
-    #     return appender
 
     def add_operation(self, obj, *, args=None, kwargs=None, color=None, forced=False):
         if isinstance(obj, list):
@@ -1483,6 +1460,17 @@ lazy_query = LazyQuery
 
 
 class PostgresqlOperations(Operations):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self._explicit_schema:
+            with self._database.atomic():
+                schemas = [x.strip() for x in self._database.execute_sql("show search_path").fetchone()[0].split(",")]
+                # we don't support user schema as default schema
+                if schemas[0] == '"$user"':
+                    schemas.pop(0)
+                if schemas:
+                    self._explicit_schema = schemas[0]
 
     def transaction(self):
         if self._atomic:

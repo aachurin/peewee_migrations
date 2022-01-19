@@ -707,7 +707,7 @@ class Router:
         self.storage.write(name, compiler.get_code())
         return alerts
 
-    def migrate(self, migration=None, atomic=True):
+    def migrate(self, migration=None, atomic=True, explicit_schema=None):
         """Run migration."""
         try:
             steps, direction = self.storage.get_steps(migration)
@@ -731,7 +731,8 @@ class Router:
                                 step_to['snapshot'].get_orm(),
                                 migrate_data,
                                 serialized_migration,
-                                atomic=atomic)
+                                atomic=atomic,
+                                explicit_schema=explicit_schema)
             migrator.migrate()
             migrator.direction = direction
             if direction == 'forward':
@@ -779,7 +780,7 @@ class Migrator:
     backward_hints = None
 
     def __init__(self, database, name, old_orm, new_orm, run_data_migration=None, run_serialized=None, *,
-                 compute_hints=False, serialize=False, atomic=True):
+                 compute_hints=False, serialize=False, atomic=True, explicit_schema=None):
         self.database = database
         self.name = name
         self.old_orm = old_orm
@@ -796,7 +797,7 @@ class Migrator:
             self.compute_hints = False
 
         self.op = get_operations_for_db(database, atomic=atomic, data_migration=run_data_migration,
-                                        old_orm=old_orm, new_orm=new_orm)
+                                        old_orm=old_orm, new_orm=new_orm, explicit_schema=explicit_schema)
 
         if serialize:
             self.recorder = OperationSerializer(self.op, self.old_orm, self.new_orm, self.serialized.add_operation)
@@ -1303,12 +1304,13 @@ def operation(fn):
 
 class Operations:
 
-    def __init__(self, database, atomic, old_orm, new_orm, data_migration=None):
+    def __init__(self, database, atomic, old_orm, new_orm, explicit_schema=None, data_migration=None):
         self._database = database
         self._atomic = atomic
         self._old_orm = old_orm
         self._new_orm = new_orm
         self._data_migration = data_migration
+        self._explicit_schema = explicit_schema
 
     def transaction(self):
         return self._database.atomic()
@@ -1545,7 +1547,7 @@ class PostgresqlOperations(Operations):
 
     def _drop_primary_key_constraint(self, model):
         table_name = model._meta.table_name
-        schema = model._meta.schema or 'public'
+        schema = model._meta.schema or self._explicit_schema or 'public'
         return (lazy_query().literal('ALTER TABLE ')
                             .sql(peewee.Entity(table_name))
                             .literal(' DROP CONSTRAINT ')
@@ -1556,9 +1558,9 @@ class PostgresqlOperations(Operations):
             return super()._add_foreign_key_constraint(model, field)
 
         table_name = model._meta.table_name
-        schema = model._meta.schema or 'public'
+        schema = model._meta.schema or self._explicit_schema or 'public'
         rel_table_name = field.rel_model._meta.table_name
-        rel_schema = field.rel_model._meta.schema or 'public'
+        rel_schema = field.rel_model._meta.schema or self._explicit_schema or 'public'
         column_name = field.column_name
         rel_column_name = field.rel_field.column_name
         return [
@@ -1598,7 +1600,7 @@ class PostgresqlOperations(Operations):
 
     def _drop_foreign_key_constraint(self, model, field):
         table_name = model._meta.table_name
-        schema = model._meta.schema or 'public'
+        schema = model._meta.schema or self._explicit_schema or 'public'
         rel_table_name = field.rel_model._meta.table_name
         rel_schema = field.rel_model._meta.schema or 'public'
         column_name = field.column_name

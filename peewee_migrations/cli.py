@@ -290,14 +290,15 @@ def list_(ctx):
 @click.argument('to', required=False, default=None)
 @click.option('-a', '--autocommit', default=False, is_flag=True, help='run without a transaction')
 @click.option('-s', '--skip', default=0, type=int, help='skip first N operations')
+@click.option('-e', '--explicit_schema', default=None, type=str, help='explicit schema name')
 @click.pass_context
-def show(ctx, to, autocommit, skip):
+def show(ctx, to, autocommit, skip, explicit_schema):
     """Show migrations"""
 
     router = load_router(ctx)
     atomic = not autocommit
     try:
-        steps = router.migrate(to, atomic=atomic)
+        steps = router.migrate(to, atomic=atomic, explicit_schema=explicit_schema)
     except MigrationError as e:
         click.secho('Migration error: ' + str(e), fg='red')
         sys.exit(1)
@@ -333,16 +334,17 @@ def show(ctx, to, autocommit, skip):
 @click.option('-s', '--skip', default=0, type=int, help='skip first N operations')
 @click.option('-a', '--autocommit', default=False, is_flag=True, help='run without a transaction')
 @click.option('-i', '--ignore-errors', default=False, is_flag=True, help='ignore errors and try to continue')
+@click.option('-e', '--explicit_schema', default=None, type=str, help='explicit schema name')
 @click.option('--traceback', is_flag=True, help='Show traceback')
 @click.pass_context
-def migrate(ctx, to, fake, skip, autocommit, traceback, ignore_errors):
+def migrate(ctx, to, fake, skip, autocommit, traceback, ignore_errors, explicit_schema):
     """Run migrations"""
 
     router = load_router(ctx)
 
     atomic = not autocommit
     try:
-        steps = router.migrate(to, atomic=atomic)
+        steps = router.migrate(to, atomic=atomic, explicit_schema=explicit_schema)
     except MigrationError as e:
         click.secho('Migration error: ' + str(e), fg='red')
         if traceback:

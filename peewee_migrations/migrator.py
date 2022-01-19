@@ -289,6 +289,9 @@ class Orm:
     def __iter__(self):
         return iter(self._items)
 
+    def get(self, item):
+        return self._mapping.get(item.lower())
+
     def __getitem__(self, item):
         return self._mapping[item.lower()]
 
@@ -792,12 +795,8 @@ class Migrator:
         else:
             self.compute_hints = False
 
-        if run_data_migration:
-            data_migration = lambda: run_data_migration(old_orm=self.old_orm, new_orm=self.new_orm)
-        else:
-            data_migration = None
-
-        self.op = get_operations_for_db(database, atomic=atomic, data_migration=data_migration)
+        self.op = get_operations_for_db(database, atomic=atomic, data_migration=run_data_migration,
+                                        old_orm=old_orm, new_orm=new_orm)
 
         if serialize:
             self.recorder = OperationSerializer(self.op, self.old_orm, self.new_orm, self.serialized.add_operation)
@@ -969,8 +968,6 @@ class Migrator:
 
     def _update_model(self, state, _, __):
         for field in state.add_fields:
-            # if field is model2._meta.primary_key:
-            #     field = self._get_primary_key_field(field)
             self.recorder.add_column(field)
             if not field.null:
                 state.add_not_null.append(field)
@@ -980,22 +977,19 @@ class Migrator:
             self.add_data_migration_hints(field, None, False)
 
         for field1, field2 in state.check_fields:
-            # XXX: hack
-            # field1.model = field2.model
-            if field1.column_name != field2.column_name:
-                self.recorder.rename_column(field1, field2.column_name)
-                field1.column_name = field2.column_name
-
             if self._field_type(field1) != self._field_type(field2):
-                old_column_name = 'old__' + field1.column_name
-                self.recorder.rename_column(field1, old_column_name)
+                self.recorder.rename_column(field1, "old__" + field1.column_name)
                 self.recorder.add_column(field2)
-                field1.column_name = old_column_name
                 state.drop_fields.append(field1)
                 if not field2.null:
                     state.add_not_null.append(field2)
                 self.add_data_migration_hints(field1, field2, True)
-            elif field1.null != field2.null:
+                continue
+
+            if field1.column_name != field2.column_name:
+                self.recorder.rename_column(field1, field2.column_name)
+
+            if field1.null != field2.null:
                 if field2.null:
                     state.drop_not_null.append(field2)
                 else:
@@ -1279,7 +1273,8 @@ class OperationSerializer:
 
     def __serialize(self, obj):
         if isinstance(obj, peewee.Field):
-            return self.__find_orm(obj.model) + "." + obj.name
+            model = getattr(obj, "original_model", obj.model)
+            return self.__find_orm(model) + "." + obj.name
         elif isinstance(obj, type) and issubclass(obj, peewee.Model):
             return self.__find_orm(obj)
         elif isinstance(obj, (int, float, str)):
@@ -1308,9 +1303,11 @@ def operation(fn):
 
 class Operations:
 
-    def __init__(self, database, atomic, data_migration=None):
+    def __init__(self, database, atomic, old_orm, new_orm, data_migration=None):
         self._database = database
         self._atomic = atomic
+        self._old_orm = old_orm
+        self._new_orm = new_orm
         self._data_migration = data_migration
 
     def transaction(self):
@@ -1327,7 +1324,7 @@ class Operations:
     @operation
     def run_data_migration(self):
         if self._data_migration:
-            return self._data_migration()
+            return self._data_migration(old_orm=self._old_orm, new_orm=self._new_orm)
         return []
 
     @operation
@@ -1385,7 +1382,14 @@ class Operations:
 
     @operation
     def rename_column(self, field, column_name):
-        return self._rename_column(field.model, field, field.column_name, column_name)
+        res = self._rename_column(field.model, field, field.column_name, column_name)
+        if field.model in self._old_orm:
+            # rename and change model if possible
+            name = field.model._meta.name
+            if self._new_orm.get(name):
+                field.model = self._new_orm[name]
+        field.column_name = column_name
+        return res
 
     @operation
     def add_primary_key_constraint(self, model):

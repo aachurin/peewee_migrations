@@ -2,7 +2,7 @@
 
 A simple and flexible migration manager for Peewee ORM.
 
-* **Version:** 0.3.23
+* **Version:** 0.3.25
 * **Status:** Development/Alpha
 * **Author:** Churin Andrey
 
@@ -131,23 +131,24 @@ Migration `0002_migration_202112161527` has been created.
 
 def migrate_forward(op, old_orm, new_orm):
     op.add_column(new_orm.foo.xyzzy)
-    op.rename_column(new_orm.foo.bar, 'old__bar')
+    op.rename_column(old_orm.foo.bar, 'old__bar')
     op.add_column(new_orm.foo.bar)
     op.run_data_migration()
-    op.drop_column(new_orm.foo.bar)
+    op.drop_column(old_orm.foo.bar)
     op.add_not_null(new_orm.foo.xyzzy)
     op.add_not_null(new_orm.foo.bar)
+
 
 ...
 
 def migrate_backward(op, old_orm, new_orm):
     op.rename_column(old_orm.foo.bar, 'old__bar')
-    op.rename_column(old_orm.foo.bar, 'old__old__bar')
-    op.add_column(old_orm.foo.bar)
+    op.add_column(new_orm.foo.bar)
     op.run_data_migration()
     op.drop_column(old_orm.foo.xyzzy)
     op.drop_column(old_orm.foo.bar)
-    op.add_not_null(old_orm.foo.bar)
+    op.add_not_null(new_orm.foo.bar)
+
 ```
 
 Serialized migrations are performed only according to the operations specified in the migrate functions.

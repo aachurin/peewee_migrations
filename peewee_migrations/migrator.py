@@ -1469,15 +1469,12 @@ class PostgresqlOperations(Operations):
                     schema = schema.strip()
                     if schema == '"$user"':
                         schema = self._database.execute_sql("select user").fetchone()[0]
-                    print(schema)
                     result = self._database.execute_sql(
                         "SELECT schema_name FROM information_schema.schemata WHERE schema_name = %s", (schema,)
                     ).fetchall()
                     if result:
                         self._explicit_schema = schema
                         break
-            print("R", self._explicit_schema)
-
 
     def transaction(self):
         if self._atomic:

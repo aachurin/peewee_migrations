@@ -1590,7 +1590,7 @@ class PostgresqlOperations(Operations):
         table_name = model._meta.table_name
         schema = model._meta.schema or self._explicit_schema or 'public'
         rel_table_name = field.rel_model._meta.table_name
-        rel_schema = field.rel_model._meta.schema or 'public'
+        rel_schema = field.rel_model._meta.schema or self._explicit_schema or 'public'
         column_name = field.column_name
         rel_column_name = field.rel_field.column_name
         return (lazy_query().literal('ALTER TABLE ')

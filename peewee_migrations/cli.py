@@ -40,6 +40,7 @@ def init_config(filename):
     with open(filename, 'wt') as f:
         data = {
             'prerun': '# some code here',
+            'init': '# some db initialization code here',
             'directory': 'migrations',
             'history': 'migratehistory',
             'models': []
@@ -205,6 +206,13 @@ def load_conf(ctx):
         sys.exit(3)
 
     conf['db'] = databases.pop()
+
+    if conf.get('init'):
+        if isinstance(conf['init'], list):
+            init_run = '\n'.join(conf['init'])
+        else:
+            init_run = conf['init']
+        exec(init_run, {'getenv': os.getenv, 'db': conf['db']})
 
     return conf
 

@@ -161,11 +161,23 @@ For more information on using the commands see --help.
 ```
 {
   "prerun": "some code here",  // some code to run before executing any command
+  "init": "some code here",    // some database initialization code in case of defer initialization
   "directory": "migrations",   // folder to hold migrations
   "history": "migratehistory", // table to hold migration history
   "models": [                  // list of models to watch
     "module1.Model1",
     "module2.Model2"
   ]
+}
+```
+
+### Run-time database configuration
+
+In case of using defer initialization (like `PostgresqlDatabase(None)`) database might be initialized using `init` section.
+To make it a little bit easier `db` and `getenv` objects are available in the code scope.
+Example code using environment variables:
+```
+{
+  "init": "db.init(getenv('DB_NAME'), user=getenv('DB_USER'), password=getenv('DB_PASSWORD', host=getenv('DB_HOST'))"
 }
 ```

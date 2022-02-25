@@ -1607,8 +1607,7 @@ class PostgresqlOperations(Operations):
 
 class MySQLOperations(Operations):
 
-    @operation
-    def drop_index(self, model, index):
+    def _drop_index(self, model, index):
         return (model._schema._drop_index(index, safe=False)
                      .literal(' ON ')
                      .sql(model))

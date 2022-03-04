@@ -363,21 +363,27 @@ class NodeDeconstructor:
             if meth is not None:
                 return meth(node)
         else:
-            self.generic_code(node)
+            return self.generic_code(node)
 
     def generic_code(self, node):
+        if node is None:
+            return None
+        if isinstance(node, (str, int, float, bool)):
+            return node
+        if isinstance(node, (list, tuple)):
+            return [self.get_code(x) for x in node]
         raise ValueError('Unsupported node: %r.' % node)
 
     @staticmethod
     def code_SQL(node):
-        return CallBlock('SQL', args=(node.sql, node.params))
+        return CallBlock('peewee.SQL', args=(node.sql, node.params))
 
     @staticmethod
     def code_Table(node):
         kwargs = {'name': node.__name__}
         if node._schema:
             kwargs['schema'] = node._schema
-        return CallBlock('Table', kwargs=kwargs)
+        return CallBlock('peewee.Table', kwargs=kwargs)
 
     def code_Index(self, node):
         kwargs = {
@@ -391,8 +397,9 @@ class NodeDeconstructor:
             kwargs['safe'] = True
         if node._using:
             kwargs['using'] = node._using
-        assert node._where is None
-        return CallBlock('Index', kwargs=kwargs)
+        if node._where:
+            kwargs['where'] = self.get_code(node._where)
+        return CallBlock('peewee.Index', kwargs=kwargs)
 
     def code_Expression(self, node):
         args = (
@@ -409,7 +416,7 @@ class NodeDeconstructor:
         return self.get_code(node.column)
 
     def code_Column(self, node):
-        return CallBlock('Column', args=(self.get_code(node.source), node.name))
+        return CallBlock('peewee.Column', args=(self.get_code(node.source), node.name))
 
 
 class Compiler:
@@ -878,8 +885,8 @@ class Migrator:
         for index in model._meta.fields_to_index():
             if self._is_index_for_foreign_key(index):
                 continue
-            ddl = self.op.ctx().sql(index).query()[0]
-            result[ddl] = index
+            ddl = self.op.ctx().sql(index).query()
+            result[(ddl[0], repr(ddl[1]))] = index
         return result
 
     def _field_type(self, field):

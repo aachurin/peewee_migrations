@@ -1,3 +1,7 @@
+<p align="center">
+    <img src="https://raw.githubusercontent.com/promisedio/promise/main/logo.svg" alt="PromisedIO" />
+</p>
+
 # Peewee Migrations
 
 A simple and flexible migration manager for Peewee ORM.
